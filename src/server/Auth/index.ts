@@ -1,0 +1,329 @@
+import express from "express";
+import { Request, Response } from "express";
+import { signupSchema } from "../serverSchema/signup";
+import { signinSchema } from "../serverSchema/signin";
+import { ApiResponse } from "../apiResponse/response";
+import { resetSchema,codeSchema,newPasswordSchema } from "../serverSchema/resetPassword";
+import { middleware } from "../middleware";
+import { prisma } from "../db/prisma";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
+const router = express.Router();
+const generateAccessToken = (email: string) => {
+    return jwt.sign(email, process.env.JWT_SECRET as string, { expiresIn: "1h" });
+};
+const generateRefreshToken = (email: string) => {
+    const token = jwt.sign(email, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: "7d" });
+
+    return token;
+};
+
+router.post("/token", async (req: Request, res: Response) => {
+    const cookies = req.cookies;
+    const refreshToken = cookies.refreshToken;
+    if (!refreshToken) {
+        new ApiResponse(null, "No refresh token provided", 400).send(res);
+    } else {
+        const isValid = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as string;
+        if (!isValid) {
+            new ApiResponse(null, "Invalid refresh token", 403).send(res);
+
+        } else {
+            const user = await prisma.user.findFirst({
+                where: {
+                    refreshToken: refreshToken
+                }
+            })
+
+            const accessToken = generateAccessToken(user?.email as string);
+
+            
+            res.cookie("accessToken", accessToken, {
+                httpOnly: true,
+                secure: false,
+                sameSite: "none",
+                maxAge: 3600 //1 hour
+            })
+
+            new ApiResponse({ accessToken: accessToken }, "Access token generated", 200).send(res);
+        }
+
+    }
+
+})
+
+router.get("/existingUser", async (req: Request, res: Response) => {
+    const response = resetSchema.safeParse(req.body);
+    if (!response.success) {
+        new ApiResponse(null, response.error.message, 400).send(res);
+    } else {
+        const { email } = response.data;
+        const isExisting = await prisma.user.findUnique({
+            where: {
+                email: email
+            }
+        })
+        if (isExisting) {
+            new ApiResponse({ exists: true }, "User exists", 200).send(res);
+        } else {
+            new ApiResponse({ exists: false }, "User does not exist", 200).send(res);
+        }
+    }
+});
+
+router.post("/signup", async (req: Request, res: Response) => {
+    const body = signupSchema.safeParse(req.body);
+    if (!body.success) {
+        new ApiResponse(null, body.error.message, 400).send(res);
+    }
+    else {
+
+       
+
+
+        const { name, email, password } = body.data;
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        const accessToken = generateAccessToken(email);
+        const refreshToken = generateRefreshToken(email);
+
+        const user = await prisma.user.create({
+            data: {
+                name,
+                email,
+                hashedPassword: hashedPassword,
+                refreshToken: refreshToken
+            }
+        })
+
+        const data = {
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                createdAt: user.emailVerified
+            },
+            accessToken: accessToken,
+        }
+       res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            sameSite: "none",
+            secure: false,
+            maxAge: 3600 //1 hour
+        });
+        res.cookie("refressToken", refreshToken, {
+            httpOnly: true,
+            sameSite: "none",
+            secure: false,
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+
+        new ApiResponse(data, "User created successfully", 201).send(res);
+    }
+
+
+})
+
+
+router.post("/signin", async (req: Request, res: Response) => {
+    const response = signinSchema.safeParse(req.body);
+    const cookies = req.cookies;
+    if (!response.success) {
+        new ApiResponse(null, response.error.message, 400).send(res);
+    } else {
+        const { email, password } = response.data;
+        const user = await prisma.user.findUnique({
+            where: {
+                email: email
+            }
+        })
+
+        if (!user) {
+            new ApiResponse(null, "Invalid email or password", 400).send(res);
+
+        } else {
+            const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
+            if (!isPasswordValid) {
+                new ApiResponse(null, "Invalid email or password", 400).send(res);
+            } else {
+                const accessToken = generateAccessToken(email);
+                const refreshToken = generateRefreshToken(email);
+                cookies.set("token", accessToken, {
+
+                    maxAge: 3600 //1 hour   
+                });
+                const updatedUser = await prisma.user.update({
+                    where: {
+                        email: email
+
+                    },
+                    data: { refreshToken: refreshToken }
+                })
+                const data = {
+                    user: {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                    },
+                    accessToken: accessToken,
+                    refreshToken: refreshToken
+                }
+                
+                res.cookie("token", accessToken, {
+                    httpOnly: true,
+                    sameSite: "none",
+                    secure: false,
+                    maxAge: 3600 //1 hour   
+                });
+
+                res.cookie("refressToken", refreshToken, {
+                    httpOnly: true,
+                    sameSite: "none",
+                    secure: false,
+                    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                });
+
+
+
+                new ApiResponse(data, "User signed in successfully", 200).send(res);
+
+
+
+
+            }
+        }
+
+    }
+})
+
+router.get("/signout", async(req:Request,res:Response)=>{
+    res.clearCookie("accessToken",{
+        httpOnly: true,
+        sameSite: "none",
+        secure: false,
+    });
+    res.clearCookie("refreshToken",{
+        httpOnly: true,
+        sameSite: "none",
+        secure: false,
+    });
+    new ApiResponse(null,"User signed out successfully",200).send(res);
+    
+})
+
+const createCode = ()=>{
+    return String(Math.floor(100000 + Math.random() * 900000));
+}
+router.post("/resetPassword",async (req:Request,res:Response)=>{
+const response = resetSchema.safeParse(req.body);
+if(!response.success){
+    new ApiResponse(null,response.error.message,400).send(res); 
+
+}else{
+    const {email} = response.data;
+    const user = await prisma.user.findUnique({
+        where:{
+            email:email
+        }
+    })
+    if(!user){
+        new ApiResponse(null,"User not found",404).send(res);
+    }else{
+        const resetCode = createCode();
+        const updatedUser = await prisma.user.update({
+            where:{
+                email:email
+            },
+            data:{
+                resetPasswordToken:resetCode
+            }
+        })
+
+        //send email
+      
+         const transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_SERVER_HOST,
+            port: Number(process.env.EMAIL_SERVER_PORT),
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_SERVER_USER,
+                pass: process.env.EMAIL_SERVER_PASSWORD
+            }
+         });
+            const mailOptions = {
+                from: process.env.EMAIL_FROM,
+                to: email,
+                subject: "Password Reset Code",
+                text: `Your password reset code is ${resetCode}`
+            };
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.log("Error sending email:", error);
+                    new ApiResponse(null, "Error sending email", 500).send(res);
+                } else {
+                    console.log("Email sent:", info.response);
+                    new ApiResponse(null, "Password reset code sent to email", 200).send(res);
+                }
+            });
+
+    }
+}
+})
+
+router.post("/verifyCode",middleware,async(req:Request,res:Response)=>{
+    const response = codeSchema.safeParse(req.body);
+    if(!response.success){
+        new ApiResponse(null,response.error.message,400).send(res);
+    }else{
+        const {email,code} = response.data;
+        const user = await prisma.user.findUnique({
+            where:{
+                email:email
+            }
+        })
+        if(!user){
+            new ApiResponse(null,"User not found",404).send(res);
+        }else{
+            if(user.resetPasswordToken !== code){
+                new ApiResponse(null,"Invalid code",400).send(res);
+            }else{
+                new ApiResponse(null,"Code verified",200).send(res);
+            }
+    }
+    }
+});
+
+router.post("/newPassword",middleware,async(req:Request,res:Response)=>{
+    const response  = newPasswordSchema.safeParse(req.body);
+    if(!response.success){
+        new ApiResponse(null,response.error.message,400).send(res); 
+    }else{
+        const {email,password} = response.data;
+        const user = await prisma.user.findUnique({
+            where:{
+                email:email
+            }
+        })
+        if(!user){
+            new ApiResponse(null,"User not found",404).send(res);
+        }
+        else{
+            const hashedPassword = bcrypt.hashSync(password,10);
+            const updatedUser = await prisma.user.update({
+                where:{
+                    email:email
+                },
+                data:{
+                    hashedPassword:hashedPassword,
+                    resetPasswordToken:null,
+                }
+            })
+            new ApiResponse(null,"Password updated successfully",200).send(res);
+        }
+    }
+
+})
+
+
+
+export default router;

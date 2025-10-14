@@ -1,26 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@import "tw-animate-css";
+/* Netflix-Style Toast Customization */
+.sonner-toast {
+  background-color: #141414 !important;
+  color: #fff !important;
+  border: 1px solid #E50914 !important;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 600;
+  border-radius: 10px !important;
+  padding: 14px 18px !important;
+  box-shadow: 0 4px 20px rgba(229, 9, 20, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: fadeInUp 0.3s ease-out;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Toast description styling */
+.sonner-toast-description {
+  color: #ccc !important;
+  font-weight: 400;
+  font-size: 0.9rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Toast icon customization */
+.sonner-toast svg {
+  color: #E50914 !important;
+}
+
+/* Animation for entry */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Success toast override */
+.sonner-toast-success {
+  border-color: #22c55e !important; /* green */
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
 }
+
+/* Info toast override */
+.sonner-toast-info {
+  border-color: #3b82f6 !important; /* blue */
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+}
+
+
+
+html, body {
+  height: 100%;
+  background: radial-gradient(circle at 20% 20%, #0b0b0b 0%, #000 100%);
+  color: #fff;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+/* 4️⃣ Netflix Background Glow Effect */
+body::before {
+  content: "";
+  position: fixed;
+  top: -10%;
+  left: -10%;
+  width: 130%;
+  height: 130%;
+  background: radial-gradient(circle at center, rgba(229,9,20,0.15) 0%, transparent 70%);
+  z-index: -1;
+  filter: blur(100px);
+  opacity: 0.6;
+}
+
+/* 5️⃣ Links */
+a {
+  color: #E50914;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+a:hover {
+  color: #b20710;
+  text-decoration: underline;
+}
+
+/* 6️⃣ Headings & Text */
+h1, h2, h3, h4, h5, h6 {
+  color: #fff;
+  font-weight: 700;
+}
+p, span, li {
+  color: #b3b3b3;
+  line-height: 1.6;
+}
+
+/* 7️⃣ Inputs */
+input, textarea, select {
+  background-color: #141414;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #E50914;
+  box-shadow: 0 0 5px rgba(229,9,20,0.6);
+  outline: none;
+}
+
+/* 8️⃣ Buttons */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+button.primary {
+  background-color: #E50914;
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+}
+button.primary:hover {
+  background-color: #b20710;
+  box-shadow: 0 0 15px rgba(229,9,20,0.7);
+}
+button.secondary {
+  background-color: #333;
+  color: #fff;
+  padding: 0.5rem 1rem;
+}
+button.secondary:hover {
+  background-color: #444;
+}
+
+/* 9️⃣ Toast Customization (Sonner) */
+.sonner-toast {
+  background-color: #141414 !important;
+  color: #fff !important;
+  border: 1px solid #E50914 !important;
+  border-radius: 10px !important;
+  font-weight: 500;
+}
+.sonner-toast-success {
+  border-color: #00d47e !important;
+}
+.sonner-toast-error {
+  border-color: #E50914 !important;
+}
+
+/* 🔟 Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0b0b;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #E50914;
+  border-radius: 10px;
+}
+
+/* 11️⃣ Card Style */
+.card {
+  background-color: #141414;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(229,9,20,0.3);
+}
+
+/* 12️⃣ Animation for Netflix Feel */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.8s ease-in-out forwards;
+}
+
+/* 13️⃣ Utility Classes */
+.text-red { color: #E50914; }
+.bg-red { background-color: #E50914; }
+.center { display: flex; justify-content: center; align-items: center; }
