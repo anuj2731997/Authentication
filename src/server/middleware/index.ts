@@ -11,7 +11,7 @@ export const middleware = (req: Request, res: Response, next: NextFunction) => {
 
   try {
     
-    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET as string) as { userId: string };
+    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET as string);
 
     
     (req as any).email = (decoded as any).email; 

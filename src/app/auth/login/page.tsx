@@ -11,19 +11,46 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {toast} from "sonner";
+import {publicApi} from "@/lib/interceptors/api";
+import {useRouter } from "next/navigation"
 
-export default function NetflixLogin() {
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const email = event.currentTarget.email.value
-    const password = event.currentTarget.password.value
-    console.log({ email, password })
+
+export default function Login() {
+  const router = useRouter();
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  const email = event.currentTarget.email.value;
+  const password = event.currentTarget.password.value;
+
+  try {
+    const login = await publicApi.post("/auth/signin", {
+      email, 
+      password, 
+    });
+
+    toast.success("Login successful 🎉", {
+      description: login.data.message,
+      className: "sonner-toast sonner-toast-success",
+    });
+
+    router.push("/");
+  } catch (err: any) {
+    console.error(err);
+
+    toast.error("Login failed 😢", {
+      description: err.response?.data?.message || "Server error",
+      className: "sonner-toast",
+    });
   }
+}
+
 
   return (
     <div className="flex justify-center items-center h-screen w-full bg-gradient-to-br from-black via-zinc-900 to-neutral-900 text-white relative overflow-hidden">
       {/* Background Image Overlay */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[url('/netflix-bg.jpg')] bg-cover bg-center opacity-20"></div>
+      <div className="absolute top-0 left-0 w-full h-full  bg-cover bg-center opacity-20"></div>
 
       {/* Login Card */}
       <Card className="relative z-10 w-full max-w-md bg-black/80 border border-red-900/30 rounded-2xl shadow-2xl p-6 backdrop-blur-sm">
@@ -32,7 +59,7 @@ export default function NetflixLogin() {
             Sign In
           </CardTitle>
           <CardDescription className="text-gray-300 mt-2">
-            Welcome back! Please login to continue watching.
+            Welcome back! Please login.
           </CardDescription>
         </CardHeader>
 

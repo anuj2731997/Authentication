@@ -17,48 +17,49 @@ const signup_1 = require("../serverSchema/signup");
 const signin_1 = require("../serverSchema/signin");
 const response_1 = require("../apiResponse/response");
 const resetPassword_1 = require("../serverSchema/resetPassword");
-const middleware_1 = require("../middleware");
 const prisma_1 = require("../db/prisma");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const logger_1 = __importDefault(require("../logger"));
 const router = express_1.default.Router();
 const generateAccessToken = (email) => {
-    return jsonwebtoken_1.default.sign(email, process.env.JWT_SECRET, { expiresIn: "1h" });
+    return jsonwebtoken_1.default.sign({ email }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
 const generateRefreshToken = (email) => {
-    const token = jsonwebtoken_1.default.sign(email, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
+    const token = jsonwebtoken_1.default.sign({ email }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
     return token;
 };
 router.post("/token", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const cookies = req.cookies;
+    logger_1.default.info("cookies", cookies);
     const refreshToken = cookies.refreshToken;
     if (!refreshToken) {
-        new response_1.ApiResponse(null, "No refresh token provided", 400).send(res);
+        return new response_1.ApiResponse(null, "No refresh token provided", 400).send(res);
     }
-    else {
-        const isValid = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-        if (!isValid) {
-            new response_1.ApiResponse(null, "Invalid refresh token", 403).send(res);
-        }
-        else {
-            const user = yield prisma_1.prisma.user.findFirst({
-                where: {
-                    refreshToken: refreshToken
-                }
-            });
-            const accessToken = generateAccessToken(user === null || user === void 0 ? void 0 : user.email);
-            res.cookie("accessToken", accessToken, {
-                httpOnly: true,
-                secure: false,
-                sameSite: "none",
-                maxAge: 3600 //1 hour
-            });
-            new response_1.ApiResponse({ accessToken: accessToken }, "Access token generated", 200).send(res);
-        }
+    let payload;
+    try {
+        payload = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
     }
+    catch (err) {
+        return new response_1.ApiResponse(null, "Invalid or expired refresh token", 403).send(res);
+    }
+    const user = yield prisma_1.prisma.user.findFirst({ where: { refreshToken } });
+    if (!user) {
+        return new response_1.ApiResponse(null, "User not found", 404).send(res);
+    }
+    const accessToken = generateAccessToken(user.email);
+    res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: false, // ⚠️ only true in HTTPS production
+        sameSite: "lax", // or "none" if using cross-site requests
+        domain: "app.myapp.local",
+        path: "/",
+        maxAge: 3600 * 1000
+    });
+    new response_1.ApiResponse({ accessToken }, "Access token generated", 200).send(res);
 }));
-router.get("/existingUser", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/existingUser", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const response = resetPassword_1.resetSchema.safeParse(req.body);
     if (!response.success) {
         new response_1.ApiResponse(null, response.error.message, 400).send(res);
@@ -88,7 +89,7 @@ router.post("/signup", (req, res) => __awaiter(void 0, void 0, void 0, function*
         const hashedPassword = bcryptjs_1.default.hashSync(password, 10);
         const accessToken = generateAccessToken(email);
         const refreshToken = generateRefreshToken(email);
-        const user = yield prisma_1.prisma.user.create({
+        const User = yield prisma_1.prisma.user.create({
             data: {
                 name,
                 email,
@@ -98,31 +99,34 @@ router.post("/signup", (req, res) => __awaiter(void 0, void 0, void 0, function*
         });
         const data = {
             user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                createdAt: user.emailVerified
+                id: User.id,
+                name: User.name,
+                email: User.email,
+                createdAt: User.emailVerified
             },
             accessToken: accessToken,
         };
         res.cookie("accessToken", accessToken, {
             httpOnly: true,
-            sameSite: "none",
-            secure: false,
-            maxAge: 3600 //1 hour
+            secure: false, // ⚠️ only true in HTTPS production
+            sameSite: "lax", // or "none" if using cross-site requests
+            domain: "app.myapp.local",
+            path: "/",
+            maxAge: 3600 * 1000 // 1 hour
         });
-        res.cookie("refressToken", refreshToken, {
+        res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            sameSite: "none",
-            secure: false,
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            secure: false, // ⚠️ only true in HTTPS production
+            sameSite: "lax", // or "none" if using cross-site requests
+            domain: "app.myapp.local",
+            path: "/",
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
         new response_1.ApiResponse(data, "User created successfully", 201).send(res);
     }
 }));
 router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const response = signin_1.signinSchema.safeParse(req.body);
-    const cookies = req.cookies;
     if (!response.success) {
         new response_1.ApiResponse(null, response.error.message, 400).send(res);
     }
@@ -144,9 +148,6 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
             else {
                 const accessToken = generateAccessToken(email);
                 const refreshToken = generateRefreshToken(email);
-                cookies.set("token", accessToken, {
-                    maxAge: 3600 //1 hour   
-                });
                 const updatedUser = yield prisma_1.prisma.user.update({
                     where: {
                         email: email
@@ -162,16 +163,20 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
                     accessToken: accessToken,
                     refreshToken: refreshToken
                 };
-                res.cookie("token", accessToken, {
+                res.cookie("accessToken", accessToken, {
                     httpOnly: true,
-                    sameSite: "none",
-                    secure: false,
+                    secure: false, // ⚠️ only true in HTTPS production
+                    sameSite: "lax", // or "none" if using cross-site requests
+                    domain: "app.myapp.local",
+                    path: "/",
                     maxAge: 3600 //1 hour   
                 });
-                res.cookie("refressToken", refreshToken, {
+                res.cookie("refreshToken", refreshToken, {
                     httpOnly: true,
-                    sameSite: "none",
-                    secure: false,
+                    secure: false, // ⚠️ only true in HTTPS production
+                    sameSite: "lax", // or "none" if using cross-site requests
+                    domain: "app.myapp.local",
+                    path: "/",
                     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
                 });
                 new response_1.ApiResponse(data, "User signed in successfully", 200).send(res);
@@ -182,13 +187,17 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
 router.get("/signout", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     res.clearCookie("accessToken", {
         httpOnly: true,
-        sameSite: "none",
-        secure: false,
+        secure: false, // ⚠️ only true in HTTPS production
+        sameSite: "lax", // or "none" if using cross-site requests
+        domain: "app.myapp.local",
+        path: "/",
     });
     res.clearCookie("refreshToken", {
         httpOnly: true,
-        sameSite: "none",
-        secure: false,
+        secure: false, // ⚠️ only true in HTTPS production
+        sameSite: "lax", // or "none" if using cross-site requests
+        domain: "app.myapp.local",
+        path: "/",
     });
     new response_1.ApiResponse(null, "User signed out successfully", 200).send(res);
 }));
@@ -249,7 +258,7 @@ router.post("/resetPassword", (req, res) => __awaiter(void 0, void 0, void 0, fu
         }
     }
 }));
-router.post("/verifyCode", middleware_1.middleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/verifyCode", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const response = resetPassword_1.codeSchema.safeParse(req.body);
     if (!response.success) {
         new response_1.ApiResponse(null, response.error.message, 400).send(res);
@@ -274,7 +283,7 @@ router.post("/verifyCode", middleware_1.middleware, (req, res) => __awaiter(void
         }
     }
 }));
-router.post("/newPassword", middleware_1.middleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/newPassword", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const response = resetPassword_1.newPasswordSchema.safeParse(req.body);
     if (!response.success) {
         new response_1.ApiResponse(null, response.error.message, 400).send(res);

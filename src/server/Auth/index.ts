@@ -3,57 +3,58 @@ import { Request, Response } from "express";
 import { signupSchema } from "../serverSchema/signup";
 import { signinSchema } from "../serverSchema/signin";
 import { ApiResponse } from "../apiResponse/response";
-import { resetSchema,codeSchema,newPasswordSchema } from "../serverSchema/resetPassword";
+import { resetSchema, codeSchema, newPasswordSchema } from "../serverSchema/resetPassword";
 import { middleware } from "../middleware";
 import { prisma } from "../db/prisma";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
+import logger from "../logger";
 const router = express.Router();
 const generateAccessToken = (email: string) => {
-    return jwt.sign(email, process.env.JWT_SECRET as string, { expiresIn: "1h" });
+    return jwt.sign({ email }, process.env.JWT_SECRET as string, { expiresIn: "1h" });
 };
 const generateRefreshToken = (email: string) => {
-    const token = jwt.sign(email, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: "7d" });
+    const token = jwt.sign({ email }, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: "7d" });
 
     return token;
 };
-
 router.post("/token", async (req: Request, res: Response) => {
     const cookies = req.cookies;
+    logger.info("cookies", cookies);
+
     const refreshToken = cookies.refreshToken;
     if (!refreshToken) {
-        new ApiResponse(null, "No refresh token provided", 400).send(res);
-    } else {
-        const isValid = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as string;
-        if (!isValid) {
-            new ApiResponse(null, "Invalid refresh token", 403).send(res);
-
-        } else {
-            const user = await prisma.user.findFirst({
-                where: {
-                    refreshToken: refreshToken
-                }
-            })
-
-            const accessToken = generateAccessToken(user?.email as string);
-
-            
-            res.cookie("accessToken", accessToken, {
-                httpOnly: true,
-                secure: false,
-                sameSite: "none",
-                maxAge: 3600 //1 hour
-            })
-
-            new ApiResponse({ accessToken: accessToken }, "Access token generated", 200).send(res);
-        }
-
+        return new ApiResponse(null, "No refresh token provided", 400).send(res);
     }
 
-})
+    let payload: string;
+    try {
+        payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as string;
+    } catch (err) {
+        return new ApiResponse(null, "Invalid or expired refresh token", 403).send(res);
+    }
 
-router.get("/existingUser", async (req: Request, res: Response) => {
+    const user = await prisma.user.findFirst({ where: { refreshToken } });
+    if (!user) {
+        return new ApiResponse(null, "User not found", 404).send(res);
+    }
+
+    const accessToken = generateAccessToken(user.email);
+
+    res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: false, // ⚠️ only true in HTTPS production
+        sameSite: "lax", // or "none" if using cross-site requests
+        domain: "app.myapp.local",
+        path: "/",
+        maxAge: 3600 * 1000
+    });
+
+    new ApiResponse({ accessToken }, "Access token generated", 200).send(res);
+});
+
+router.post("/existingUser", async (req: Request, res: Response) => {
     const response = resetSchema.safeParse(req.body);
     if (!response.success) {
         new ApiResponse(null, response.error.message, 400).send(res);
@@ -79,7 +80,7 @@ router.post("/signup", async (req: Request, res: Response) => {
     }
     else {
 
-       
+
 
 
         const { name, email, password } = body.data;
@@ -87,7 +88,7 @@ router.post("/signup", async (req: Request, res: Response) => {
         const accessToken = generateAccessToken(email);
         const refreshToken = generateRefreshToken(email);
 
-        const user = await prisma.user.create({
+        const User = await prisma.user.create({
             data: {
                 name,
                 email,
@@ -98,24 +99,29 @@ router.post("/signup", async (req: Request, res: Response) => {
 
         const data = {
             user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                createdAt: user.emailVerified
+                id: User.id,
+                name: User.name,
+                email: User.email,
+                createdAt: User.emailVerified
             },
             accessToken: accessToken,
         }
-       res.cookie("accessToken", accessToken, {
+        res.cookie("accessToken", accessToken, {
             httpOnly: true,
-            sameSite: "none",
-            secure: false,
-            maxAge: 3600 //1 hour
+            secure: false, // ⚠️ only true in HTTPS production
+            sameSite: "lax", // or "none" if using cross-site requests
+            domain: "app.myapp.local",
+            path: "/",
+            maxAge: 3600 * 1000 // 1 hour
         });
-        res.cookie("refressToken", refreshToken, {
+
+        res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            sameSite: "none",
-            secure: false,
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            secure: false, // ⚠️ only true in HTTPS production
+            sameSite: "lax", // or "none" if using cross-site requests
+            domain: "app.myapp.local",
+            path: "/",
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
         new ApiResponse(data, "User created successfully", 201).send(res);
@@ -127,7 +133,7 @@ router.post("/signup", async (req: Request, res: Response) => {
 
 router.post("/signin", async (req: Request, res: Response) => {
     const response = signinSchema.safeParse(req.body);
-    const cookies = req.cookies;
+
     if (!response.success) {
         new ApiResponse(null, response.error.message, 400).send(res);
     } else {
@@ -148,10 +154,7 @@ router.post("/signin", async (req: Request, res: Response) => {
             } else {
                 const accessToken = generateAccessToken(email);
                 const refreshToken = generateRefreshToken(email);
-                cookies.set("token", accessToken, {
 
-                    maxAge: 3600 //1 hour   
-                });
                 const updatedUser = await prisma.user.update({
                     where: {
                         email: email
@@ -159,6 +162,7 @@ router.post("/signin", async (req: Request, res: Response) => {
                     },
                     data: { refreshToken: refreshToken }
                 })
+
                 const data = {
                     user: {
                         id: user.id,
@@ -168,18 +172,22 @@ router.post("/signin", async (req: Request, res: Response) => {
                     accessToken: accessToken,
                     refreshToken: refreshToken
                 }
-                
-                res.cookie("token", accessToken, {
+
+                res.cookie("accessToken", accessToken, {
                     httpOnly: true,
-                    sameSite: "none",
-                    secure: false,
+                    secure: false, // ⚠️ only true in HTTPS production
+                    sameSite: "lax", // or "none" if using cross-site requests
+                    domain: "app.myapp.local",
+                    path: "/",
                     maxAge: 3600 //1 hour   
                 });
 
-                res.cookie("refressToken", refreshToken, {
+                res.cookie("refreshToken", refreshToken, {
                     httpOnly: true,
-                    sameSite: "none",
-                    secure: false,
+                    secure: false, // ⚠️ only true in HTTPS production
+                    sameSite: "lax", // or "none" if using cross-site requests
+                    domain: "app.myapp.local",
+                    path: "/",
                     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
                 });
 
@@ -196,60 +204,64 @@ router.post("/signin", async (req: Request, res: Response) => {
     }
 })
 
-router.get("/signout", async(req:Request,res:Response)=>{
-    res.clearCookie("accessToken",{
+router.get("/signout", async (req: Request, res: Response) => {
+    res.clearCookie("accessToken", {
         httpOnly: true,
-        sameSite: "none",
-        secure: false,
+        secure: false, // ⚠️ only true in HTTPS production
+        sameSite: "lax", // or "none" if using cross-site requests
+        domain: "app.myapp.local",
+        path: "/",
     });
-    res.clearCookie("refreshToken",{
+    res.clearCookie("refreshToken", {
         httpOnly: true,
-        sameSite: "none",
-        secure: false,
+        secure: false, // ⚠️ only true in HTTPS production
+        sameSite: "lax", // or "none" if using cross-site requests
+        domain: "app.myapp.local",
+        path: "/",
     });
-    new ApiResponse(null,"User signed out successfully",200).send(res);
-    
+    new ApiResponse(null, "User signed out successfully", 200).send(res);
+
 })
 
-const createCode = ()=>{
+const createCode = () => {
     return String(Math.floor(100000 + Math.random() * 900000));
 }
-router.post("/resetPassword",async (req:Request,res:Response)=>{
-const response = resetSchema.safeParse(req.body);
-if(!response.success){
-    new ApiResponse(null,response.error.message,400).send(res); 
+router.post("/resetPassword", async (req: Request, res: Response) => {
+    const response = resetSchema.safeParse(req.body);
+    if (!response.success) {
+        new ApiResponse(null, response.error.message, 400).send(res);
 
-}else{
-    const {email} = response.data;
-    const user = await prisma.user.findUnique({
-        where:{
-            email:email
-        }
-    })
-    if(!user){
-        new ApiResponse(null,"User not found",404).send(res);
-    }else{
-        const resetCode = createCode();
-        const updatedUser = await prisma.user.update({
-            where:{
-                email:email
-            },
-            data:{
-                resetPasswordToken:resetCode
+    } else {
+        const { email } = response.data;
+        const user = await prisma.user.findUnique({
+            where: {
+                email: email
             }
         })
+        if (!user) {
+            new ApiResponse(null, "User not found", 404).send(res);
+        } else {
+            const resetCode = createCode();
+            const updatedUser = await prisma.user.update({
+                where: {
+                    email: email
+                },
+                data: {
+                    resetPasswordToken: resetCode
+                }
+            })
 
-        //send email
-      
-         const transporter = nodemailer.createTransport({
-            host: process.env.EMAIL_SERVER_HOST,
-            port: Number(process.env.EMAIL_SERVER_PORT),
-            secure: false,
-            auth: {
-                user: process.env.EMAIL_SERVER_USER,
-                pass: process.env.EMAIL_SERVER_PASSWORD
-            }
-         });
+            //send email
+
+            const transporter = nodemailer.createTransport({
+                host: process.env.EMAIL_SERVER_HOST,
+                port: Number(process.env.EMAIL_SERVER_PORT),
+                secure: false,
+                auth: {
+                    user: process.env.EMAIL_SERVER_USER,
+                    pass: process.env.EMAIL_SERVER_PASSWORD
+                }
+            });
             const mailOptions = {
                 from: process.env.EMAIL_FROM,
                 to: email,
@@ -266,59 +278,59 @@ if(!response.success){
                 }
             });
 
+        }
     }
-}
 })
 
-router.post("/verifyCode",middleware,async(req:Request,res:Response)=>{
+router.post("/verifyCode", async (req: Request, res: Response) => {
     const response = codeSchema.safeParse(req.body);
-    if(!response.success){
-        new ApiResponse(null,response.error.message,400).send(res);
-    }else{
-        const {email,code} = response.data;
+    if (!response.success) {
+        new ApiResponse(null, response.error.message, 400).send(res);
+    } else {
+        const { email, code } = response.data;
         const user = await prisma.user.findUnique({
-            where:{
-                email:email
+            where: {
+                email: email
             }
         })
-        if(!user){
-            new ApiResponse(null,"User not found",404).send(res);
-        }else{
-            if(user.resetPasswordToken !== code){
-                new ApiResponse(null,"Invalid code",400).send(res);
-            }else{
-                new ApiResponse(null,"Code verified",200).send(res);
+        if (!user) {
+            new ApiResponse(null, "User not found", 404).send(res);
+        } else {
+            if (user.resetPasswordToken !== code) {
+                new ApiResponse(null, "Invalid code", 400).send(res);
+            } else {
+                new ApiResponse(null, "Code verified", 200).send(res);
             }
-    }
+        }
     }
 });
 
-router.post("/newPassword",middleware,async(req:Request,res:Response)=>{
-    const response  = newPasswordSchema.safeParse(req.body);
-    if(!response.success){
-        new ApiResponse(null,response.error.message,400).send(res); 
-    }else{
-        const {email,password} = response.data;
+router.post("/newPassword", async (req: Request, res: Response) => {
+    const response = newPasswordSchema.safeParse(req.body);
+    if (!response.success) {
+        new ApiResponse(null, response.error.message, 400).send(res);
+    } else {
+        const { email, password } = response.data;
         const user = await prisma.user.findUnique({
-            where:{
-                email:email
+            where: {
+                email: email
             }
         })
-        if(!user){
-            new ApiResponse(null,"User not found",404).send(res);
+        if (!user) {
+            new ApiResponse(null, "User not found", 404).send(res);
         }
-        else{
-            const hashedPassword = bcrypt.hashSync(password,10);
+        else {
+            const hashedPassword = bcrypt.hashSync(password, 10);
             const updatedUser = await prisma.user.update({
-                where:{
-                    email:email
+                where: {
+                    email: email
                 },
-                data:{
-                    hashedPassword:hashedPassword,
-                    resetPasswordToken:null,
+                data: {
+                    hashedPassword: hashedPassword,
+                    resetPasswordToken: null,
                 }
             })
-            new ApiResponse(null,"Password updated successfully",200).send(res);
+            new ApiResponse(null, "Password updated successfully", 200).send(res);
         }
     }
 

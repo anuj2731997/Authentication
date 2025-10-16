@@ -1,8 +1,14 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
-
+console.log("backend url",process.env.NEXT_PUBLIC_BACKEND_URL);
 const api: AxiosInstance = axios.create({
-  baseURL: process.env.BACKEND_URL || "http://localhost:5000",
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL ,
+  withCredentials: true, // send cookies automatically
+});
+console.log("backend url",process.env.NEXT_PUBLIC_BACKEND_URL);
+
+export const publicApi: AxiosInstance = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
   withCredentials: true, // send cookies automatically
 });
 
