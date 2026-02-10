@@ -34,8 +34,8 @@ export default function Login() {
       description: login.data.message,
       className: "sonner-toast sonner-toast-success",
     });
-
-    router.push("/");
+    const data = login.data.data;
+    router.push(`/?name=${data.user.name}`);
   } catch (err: any) {
     console.error(err);
 
@@ -113,7 +113,7 @@ export default function Login() {
 
         <CardFooter className="flex flex-col items-center mt-6">
           <p className="text-sm text-gray-400">
-            New to Netflix?{" "}
+            New?{" "}
             <a href="/auth/register" className="text-red-500 hover:text-red-400 underline">
               Sign up now
             </a>

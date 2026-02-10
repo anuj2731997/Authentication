@@ -17,11 +17,14 @@ const signup_1 = require("../serverSchema/signup");
 const signin_1 = require("../serverSchema/signin");
 const response_1 = require("../apiResponse/response");
 const resetPassword_1 = require("../serverSchema/resetPassword");
+const middleware_1 = require("../middleware");
 const prisma_1 = require("../db/prisma");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const logger_1 = __importDefault(require("../logger"));
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 const router = express_1.default.Router();
 const generateAccessToken = (email) => {
     return jsonwebtoken_1.default.sign({ email }, process.env.JWT_SECRET, { expiresIn: "1h" });
@@ -53,13 +56,14 @@ router.post("/token", (req, res) => __awaiter(void 0, void 0, void 0, function* 
         httpOnly: true,
         secure: false, // ⚠️ only true in HTTPS production
         sameSite: "lax", // or "none" if using cross-site requests
-        domain: "app.myapp.local",
+        // domain: "app.myapp.local",
         path: "/",
         maxAge: 3600 * 1000
     });
     new response_1.ApiResponse({ accessToken }, "Access token generated", 200).send(res);
 }));
 router.post("/existingUser", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log(req.body);
     const response = resetPassword_1.resetSchema.safeParse(req.body);
     if (!response.success) {
         new response_1.ApiResponse(null, response.error.message, 400).send(res);
@@ -110,7 +114,7 @@ router.post("/signup", (req, res) => __awaiter(void 0, void 0, void 0, function*
             httpOnly: true,
             secure: false, // ⚠️ only true in HTTPS production
             sameSite: "lax", // or "none" if using cross-site requests
-            domain: "app.myapp.local",
+            // domain: "app.myapp.local",
             path: "/",
             maxAge: 3600 * 1000 // 1 hour
         });
@@ -118,7 +122,7 @@ router.post("/signup", (req, res) => __awaiter(void 0, void 0, void 0, function*
             httpOnly: true,
             secure: false, // ⚠️ only true in HTTPS production
             sameSite: "lax", // or "none" if using cross-site requests
-            domain: "app.myapp.local",
+            // domain: "app.myapp.local",
             path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
@@ -167,7 +171,7 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
                     httpOnly: true,
                     secure: false, // ⚠️ only true in HTTPS production
                     sameSite: "lax", // or "none" if using cross-site requests
-                    domain: "app.myapp.local",
+                    // domain: "app.myapp.local",
                     path: "/",
                     maxAge: 3600 //1 hour   
                 });
@@ -175,7 +179,7 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
                     httpOnly: true,
                     secure: false, // ⚠️ only true in HTTPS production
                     sameSite: "lax", // or "none" if using cross-site requests
-                    domain: "app.myapp.local",
+                    // domain: "app.myapp.local",
                     path: "/",
                     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
                 });
@@ -184,19 +188,19 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
         }
     }
 }));
-router.get("/signout", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get("/signout", middleware_1.middleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     res.clearCookie("accessToken", {
         httpOnly: true,
         secure: false, // ⚠️ only true in HTTPS production
         sameSite: "lax", // or "none" if using cross-site requests
-        domain: "app.myapp.local",
+        // domain: "app.myapp.local",
         path: "/",
     });
     res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: false, // ⚠️ only true in HTTPS production
         sameSite: "lax", // or "none" if using cross-site requests
-        domain: "app.myapp.local",
+        // domain: "app.myapp.local",
         path: "/",
     });
     new response_1.ApiResponse(null, "User signed out successfully", 200).send(res);

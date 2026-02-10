@@ -10,6 +10,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import logger from "../logger";
+import dotenv from "dotenv";
+dotenv.config();
 const router = express.Router();
 const generateAccessToken = (email: string) => {
     return jwt.sign({ email }, process.env.JWT_SECRET as string, { expiresIn: "1h" });
@@ -46,7 +48,7 @@ router.post("/token", async (req: Request, res: Response) => {
         httpOnly: true,
         secure: false, // ⚠️ only true in HTTPS production
         sameSite: "lax", // or "none" if using cross-site requests
-        domain: "app.myapp.local",
+        // domain: "app.myapp.local",
         path: "/",
         maxAge: 3600 * 1000
     });
@@ -55,6 +57,7 @@ router.post("/token", async (req: Request, res: Response) => {
 });
 
 router.post("/existingUser", async (req: Request, res: Response) => {
+    console.log(req.body)
     const response = resetSchema.safeParse(req.body);
     if (!response.success) {
         new ApiResponse(null, response.error.message, 400).send(res);
@@ -110,7 +113,7 @@ router.post("/signup", async (req: Request, res: Response) => {
             httpOnly: true,
             secure: false, // ⚠️ only true in HTTPS production
             sameSite: "lax", // or "none" if using cross-site requests
-            domain: "app.myapp.local",
+            // domain: "app.myapp.local",
             path: "/",
             maxAge: 3600 * 1000 // 1 hour
         });
@@ -119,7 +122,7 @@ router.post("/signup", async (req: Request, res: Response) => {
             httpOnly: true,
             secure: false, // ⚠️ only true in HTTPS production
             sameSite: "lax", // or "none" if using cross-site requests
-            domain: "app.myapp.local",
+            // domain: "app.myapp.local",
             path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
@@ -177,7 +180,7 @@ router.post("/signin", async (req: Request, res: Response) => {
                     httpOnly: true,
                     secure: false, // ⚠️ only true in HTTPS production
                     sameSite: "lax", // or "none" if using cross-site requests
-                    domain: "app.myapp.local",
+                    // domain: "app.myapp.local",
                     path: "/",
                     maxAge: 3600 //1 hour   
                 });
@@ -186,7 +189,7 @@ router.post("/signin", async (req: Request, res: Response) => {
                     httpOnly: true,
                     secure: false, // ⚠️ only true in HTTPS production
                     sameSite: "lax", // or "none" if using cross-site requests
-                    domain: "app.myapp.local",
+                    // domain: "app.myapp.local",
                     path: "/",
                     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
                 });
@@ -204,19 +207,19 @@ router.post("/signin", async (req: Request, res: Response) => {
     }
 })
 
-router.get("/signout", async (req: Request, res: Response) => {
+router.get("/signout",middleware, async (req: Request, res: Response) => {
     res.clearCookie("accessToken", {
         httpOnly: true,
         secure: false, // ⚠️ only true in HTTPS production
         sameSite: "lax", // or "none" if using cross-site requests
-        domain: "app.myapp.local",
+        // domain: "app.myapp.local",
         path: "/",
     });
     res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: false, // ⚠️ only true in HTTPS production
         sameSite: "lax", // or "none" if using cross-site requests
-        domain: "app.myapp.local",
+        // domain: "app.myapp.local",
         path: "/",
     });
     new ApiResponse(null, "User signed out successfully", 200).send(res);

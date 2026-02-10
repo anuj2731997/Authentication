@@ -85,7 +85,8 @@ const searchParams = useSearchParams();
           description: "You can now log in with your new account.",
           className: "sonner-toast sonner-toast-success",
         });
-        router.push("/");
+        const data = response.data.data;
+        router.push(`/?name=${data.user.name}`);
       }
       else{
         toast.error("User registration failed 😢", {
