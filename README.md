@@ -1,12 +1,3 @@
-Here is an **optimized, clean, and professional README** with:
-
-* better structure
-* removed repetition
-* clearer setup steps
-* consistent formatting
-* resume-ready language
-
-You can **directly replace** your current README with this 👇
 
 ---
 
