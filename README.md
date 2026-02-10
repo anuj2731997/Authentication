@@ -79,21 +79,6 @@ Designed with **real-world backend practices**, this project is suitable for **p
 
 ✅ Ensures **email ownership verification** and secure password recovery.
 
----
-
-## 📩 Email Configuration (Gmail SMTP)
-
-```env
-EMAIL_SERVER_HOST=smtp.gmail.com
-EMAIL_SERVER_PORT=587
-EMAIL_SERVER_USER=your_email@gmail.com
-EMAIL_SERVER_PASSWORD=your_app_password
-EMAIL_FROM=Auth Service <your_email@gmail.com>
-```
-
-⚠️ Use **Gmail App Passwords** (not your actual Gmail password).
-
----
 
 ## 🛠️ Installation & Setup
 
@@ -151,6 +136,22 @@ touch .env
 ```
 
 Copy values from `sample.env` and replace with actual credentials.
+
+---
+
+---
+
+## 📩 Email Configuration (Gmail SMTP)
+
+```env
+EMAIL_SERVER_HOST=smtp.gmail.com
+EMAIL_SERVER_PORT=587
+EMAIL_SERVER_USER=your_email@gmail.com
+EMAIL_SERVER_PASSWORD=your_app_password
+EMAIL_FROM=Auth Service <your_email@gmail.com>
+```
+
+⚠️ Use **Gmail App Passwords** (not your actual Gmail password).
 
 ---
 
