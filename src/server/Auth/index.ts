@@ -46,9 +46,9 @@ router.post("/token", async (req: Request, res: Response) => {
 
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        secure: false, // ⚠️ only true in HTTPS production
-        sameSite: "lax", // or "none" if using cross-site requests
-        // domain: "app.myapp.local",
+        secure: false, 
+        sameSite: "lax", 
+        
         path: "/",
         maxAge: 3600 * 1000
     });
@@ -111,20 +111,19 @@ router.post("/signup", async (req: Request, res: Response) => {
         }
         res.cookie("accessToken", accessToken, {
             httpOnly: true,
-            secure: false, // ⚠️ only true in HTTPS production
-            sameSite: "lax", // or "none" if using cross-site requests
-            // domain: "app.myapp.local",
+            secure: false, 
+            sameSite: "lax", 
+            
             path: "/",
-            maxAge: 3600 * 1000 // 1 hour
+            maxAge: 3600 * 1000 
         });
 
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            secure: false, // ⚠️ only true in HTTPS production
-            sameSite: "lax", // or "none" if using cross-site requests
-            // domain: "app.myapp.local",
+            secure: false, 
+            sameSite: "lax",
             path: "/",
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+            maxAge: 7 * 24 * 60 * 60 * 1000 
         });
 
         new ApiResponse(data, "User created successfully", 201).send(res);
@@ -178,20 +177,18 @@ router.post("/signin", async (req: Request, res: Response) => {
 
                 res.cookie("accessToken", accessToken, {
                     httpOnly: true,
-                    secure: false, // ⚠️ only true in HTTPS production
-                    sameSite: "lax", // or "none" if using cross-site requests
-                    // domain: "app.myapp.local",
+                    secure: false,
+                    sameSite: "lax", 
                     path: "/",
-                    maxAge: 3600 //1 hour   
+                    maxAge: 3600   
                 });
 
                 res.cookie("refreshToken", refreshToken, {
                     httpOnly: true,
-                    secure: false, // ⚠️ only true in HTTPS production
-                    sameSite: "lax", // or "none" if using cross-site requests
-                    // domain: "app.myapp.local",
+                    secure: false, 
+                    sameSite: "lax",
                     path: "/",
-                    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                    maxAge: 7 * 24 * 60 * 60 * 1000, 
                 });
 
 
@@ -210,16 +207,14 @@ router.post("/signin", async (req: Request, res: Response) => {
 router.get("/signout",middleware, async (req: Request, res: Response) => {
     res.clearCookie("accessToken", {
         httpOnly: true,
-        secure: false, // ⚠️ only true in HTTPS production
-        sameSite: "lax", // or "none" if using cross-site requests
-        // domain: "app.myapp.local",
+        secure: false, 
+        sameSite: "lax", 
         path: "/",
     });
     res.clearCookie("refreshToken", {
         httpOnly: true,
-        secure: false, // ⚠️ only true in HTTPS production
-        sameSite: "lax", // or "none" if using cross-site requests
-        // domain: "app.myapp.local",
+        secure: false,
+        sameSite: "lax", 
         path: "/",
     });
     new ApiResponse(null, "User signed out successfully", 200).send(res);
@@ -254,7 +249,7 @@ router.post("/resetPassword", async (req: Request, res: Response) => {
                 }
             })
 
-            //send email
+            
 
             const transporter = nodemailer.createTransport({
                 host: process.env.EMAIL_SERVER_HOST,
